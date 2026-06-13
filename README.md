@@ -38,7 +38,7 @@ DEEPSEEK_API_KEY=sk-你的DeepSeek密钥
 QWEN_API_KEY=sk-你的千问密钥（可选，图表解读用）
 ```
 
-DeepSeek API Key 在 [platform.deepseek.com](https://platform.deepseek.com) 获取，充值后按量计费（约 ¥1/百万 token）。
+DeepSeek API Key 在 [platform.deepseek.com](https://platform.deepseek.com) 获取，充值 ¥10 能用很久——每次分析约 ¥0.01-0.02（1-2 分钱），¥10 ≈ 500-1000 次。
 
 ### 4. 启动
 
