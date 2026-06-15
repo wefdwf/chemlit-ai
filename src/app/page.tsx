@@ -177,27 +177,47 @@ export default function Home() {
     // 注意：不清除 selectedSubject/userQuestion/chartResult/chartImage/chartError/chartPending
     // 因为这些会触发缓存 effect 把旧有效缓存覆盖成空值，导致"继续上次文献"恢复不出来
 
-    try {
-      // 客户端预检：文件过大直接拒绝，不等服务端返回 413
-      const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB，与 next.config.ts 保持一致
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error("目前上传的PDF过大（超过20MB），无法进行加载，请尝试压缩PDF后重新上传");
-      }
+	    try {
+	      // 浏览器端 PDF 解析（pdf.js），绕过 Vercel 4.5MB 请求体限制
+	      const pdfjsLib = await import("pdfjs-dist");
+	      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) {
-        if (res.status === 413) {
-          throw new Error("目前上传的PDF过大（超过20MB），无法进行加载，请尝试压缩PDF后重新上传");
-        }
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `上传失败 (${res.status})`);
-      }
-      const data = await res.json();
-      setPaperText(data.text);
-      setPaperTitle(data.title);
-    } catch (e) {
+	      const arrayBuffer = await file.arrayBuffer();
+	      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+	      if (pdf.numPages > 30) {
+	        throw new Error(`PDF 共 ${pdf.numPages} 页，超过 30 页限制，请上传更短的文献`);
+	      }
+
+	      const pageTexts: string[] = [];
+	      for (let i = 1; i <= pdf.numPages; i++) {
+	        const page = await pdf.getPage(i);
+	        const content = await page.getTextContent();
+	        const text = content.items
+	          .map((item) => ("str" in item ? (item as { str: string }).str : ""))
+	          .join(" ");
+	        pageTexts.push(text);
+	      }
+	      const fullText = pageTexts.join("\n\n");
+
+	      if (!fullText.trim()) {
+	        throw new Error("PDF 中未能提取到文字，可能是扫描版 PDF");
+	      }
+
+	      // 发送提取后的文本（而非 PDF 文件），轻松通过 Vercel 限制
+	      const res = await fetch("/api/upload", {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify({ text: fullText, title: file.name }),
+	      });
+	      if (!res.ok) {
+	        const errText = await res.text().catch(() => "");
+	        throw new Error(errText || `上传失败 (${res.status})`);
+	      }
+	      const data = await res.json();
+	      setPaperText(data.text);
+	      setPaperTitle(data.title);
+	    } catch (e) {
       setError(e instanceof Error ? e.message : "上传失败");
     } finally {
       setUploading(false);
