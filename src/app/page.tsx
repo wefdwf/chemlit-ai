@@ -180,7 +180,7 @@ export default function Home() {
 	    try {
 	      // 浏览器端 PDF 解析（pdf.js），绕过 Vercel 4.5MB 请求体限制
 	      const pdfjsLib = await import("pdfjs-dist");
-	      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+	      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 	      const arrayBuffer = await file.arrayBuffer();
 	      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
