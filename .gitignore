@@ -42,5 +42,21 @@ next-env.d.ts
 *.tar.gz
 
 .vercel
-.vercel
 .claude/.verification-done
+
+# 面试文档（本地保留）
+面试准备-AI产品经理.md
+ChemLit-AI产品经理面试准备.docx
+
+# Python
+__pycache__/
+
+# RAG Demo（本地）
+rag_chroma_db/
+RAG_DEMO.md
+
+# 临时文件
+jd_texts.json
+test_rag.py
+ab_test_result.json
+rag_demo.py
