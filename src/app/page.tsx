@@ -121,7 +121,7 @@ export default function Home() {
         if (cache.chartResult) setChartResult(typeof cache.chartResult === "string" ? cache.chartResult : null);
         // 继续上次文献 → 恢复到上次停留的 tab
         if (cache.activeTab && typeof cache.activeTab === "string") setActiveTab(cache.activeTab as Tab);
-        // 恢复图表图片（base64，仅当缓存中存在且为字符串时）
+        // 恢复图表图片（降级写入时可能不存在，正常）
         if (cache.chartImage && typeof cache.chartImage === "string") setChartImage(cache.chartImage);
         setHasCache(false);
       }
@@ -131,32 +131,41 @@ export default function Home() {
   // 状态变化时写入缓存（仅在有实际内容时写入，防止上传过渡期空值覆盖有效缓存）
   useEffect(() => {
     if (!paperText) return;
-    // 至少有一个分析结果或用户输入才写入缓存，避免空状态覆盖旧缓存
     const hasContent = mainResult
       || Object.values(results).some(r => r !== null)
       || chartResult
       || userQuestion.trim()
       || selectedSubject;
     if (!hasContent) return;
+
+    const data = {
+      paperText, paperTitle, selectedSubject, userQuestion,
+      mainResult, results, chartResult, chartImage, activeTab,
+    };
+
+    // 先尝试完整写入（含图表 base64）
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
-        paperText,
-        paperTitle,
-        selectedSubject,
-        userQuestion,
-        mainResult,
-        results,
-        chartResult,
-        chartImage,
-        activeTab,
-      }));
-    } catch { /* 存储满则静默跳过 */ }
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      return;
+    } catch (e) {
+      // 只有配额超限才降级，其他错误（如 localStorage 损坏）忽略本次写入
+      if (!(e instanceof DOMException) || e.name !== "QuotaExceededError") return;
+    }
+
+    // 降级：去掉图表图片，至少保留文字结果
+    try {
+      const { chartImage: _, ...withoutImage } = data;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(withoutImage));
+    } catch { /* 降级也失败则放弃 */ }
   }, [paperText, paperTitle, selectedSubject, userQuestion, mainResult, results, chartResult, chartImage, activeTab]);
 
   // 上传 PDF
   const handleFile = useCallback(async (file: File) => {
     setUploading(true);
     setError(null);
+    // 开始上传新文献 → 立即隐藏"继续上次文献"按钮，清除旧缓存
+    setHasCache(false);
+    try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
     setResults({ overview: null, structure: null, terms: null, chart: null });
     setMainResult(null);
     setMainRequested(false);
@@ -169,16 +178,25 @@ export default function Home() {
     // 因为这些会触发缓存 effect 把旧有效缓存覆盖成空值，导致"继续上次文献"恢复不出来
 
     try {
+      // 客户端预检：文件过大直接拒绝，不等服务端返回 413
+      const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB，与 next.config.ts 保持一致
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error("目前上传的PDF过大（超过20MB），无法进行加载，请尝试压缩PDF后重新上传");
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error("目前上传的PDF过大（超过20MB），无法进行加载，请尝试压缩PDF后重新上传");
+        }
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `上传失败 (${res.status})`);
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
       setPaperText(data.text);
       setPaperTitle(data.title);
-      // 上传新文献 → 清除旧缓存，"继续上次文献"按钮消失
-      try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
-      setHasCache(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "上传失败");
     } finally {
@@ -234,8 +252,11 @@ export default function Home() {
         }),
         signal: controller.signal,
       });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `分析失败 (${res.status})`);
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
       setMainResult(data.result);
       setMainCollapsed(false); // 首次分析/重新分析自动展开
       setMainRequested(true);
@@ -276,8 +297,11 @@ export default function Home() {
             force,
           }),
         });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || `分析失败 (${res.status})`);
+        }
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
         setResults((prev) => ({ ...prev, [tab]: data.result }));
       } catch (e) {
         setError(e instanceof Error ? e.message : "分析失败");
@@ -369,8 +393,11 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64, mimeType: chartPending.mimeType, paperText, userQuestion }),
       });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `图表解读失败 (${res.status})`);
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
       setChartResult(data.result);
     } catch (err) {
       setChartError(err instanceof Error ? err.message : "图表解读失败");
@@ -882,6 +909,10 @@ function ChartUploadTab({
           </p>
         </label>
       </div>
+
+      <p className="text-xs text-slate-400 mt-2 text-center">
+        提示：截图文件过大时，刷新页面后再次点击本模块可能无法显示图表、仅有文字解读
+      </p>
 
       {/* 确认上传 */}
       {chartPending && (
