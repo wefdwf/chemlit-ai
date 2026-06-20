@@ -673,15 +673,7 @@ export default function Home() {
                   <span className="text-xs text-blue-400">
                     基于你的提问，AI 已分析文献并给出建议
                   </span>
-                  <button
-                    onClick={() => runMainAnalysis(true)}
-                    disabled={mainLoading}
-                    className="ml-auto text-xs px-3 py-1 rounded-lg bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
-                    title="重新调用 AI 分析，跳过缓存"
-                  >
-                    {mainLoading ? "⏳ 分析中..." : "🔄 重新分析"}
-                  </button>
-                  <button
+<button
                     onClick={() => setMainCollapsed(!mainCollapsed)}
                     className="text-xs px-3 py-1 rounded-lg bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
                   >
