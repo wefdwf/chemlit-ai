@@ -14,7 +14,9 @@
 | 语言 | TypeScript |
 | 样式 | Tailwind CSS 4 |
 | AI | DeepSeek Chat API |
-| PDF 解析 | unpdf |
+| PDF 解析 | pdfjs-dist（浏览器端解析） |
+| 图表解读 | 千问 VL API |
+| 部署 | Vercel + 自定义域名 chemlit.cyou |
 
 ## 本地运行
 
@@ -35,7 +37,7 @@ npm install
 
 ```env
 DEEPSEEK_API_KEY=sk-你的DeepSeek密钥
-QWEN_API_KEY=sk-你的千问密钥（可选，图表解读用）
+DASHSCOPE_API_KEY=sk-你的千问密钥（可选，图表解读用）
 ```
 
 DeepSeek API Key 在 [platform.deepseek.com](https://platform.deepseek.com) 获取，充值 ¥10 能用很久——每次分析约 ¥0.01-0.02（1-2 分钱），¥10 ≈ 500-1000 次。
@@ -57,22 +59,23 @@ npm run start
 
 ## 部署
 
-### Render（免费托管，推荐）
+### Vercel（已上线）
+
+线上地址：https://chemlit.cyou
+
+自动部署：推送代码到 GitHub → Vercel 自动重新部署。
+
+> Vercel Hobby 版函数超时 10 秒，本项目通过 `max_tokens=4096` + PDF 30 页限制控制在范围内。若需更长分析时间，可改用 Render。
+
+### Render（备选）
 
 1. 把代码推送到 GitHub 仓库
-2. 在 [render.com](https://render.com) 注册（GitHub 登录）
+2. 在 [render.com](https://render.com) 注册
 3. 点 **New Web Service** → 选择仓库
-4. 设置：
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm run start`
-   - **环境变量**：添加 `DEEPSEEK_API_KEY`
-5. 点 **Create Web Service**，3 分钟后上线
-
-Render 免费版 750 小时/月，一个人用绰绰有余。唯一缺点：15 分钟无请求会自动休眠，下次访问需等 30-60 秒冷启动。
-
-### Vercel（不推荐免费版）
-
-Vercel Hobby 版函数超时限制 10 秒，DeepSeek API 调用通常需要 30-60 秒，会频繁超时报错。如需用 Vercel，需升级 Pro（$20/月）。
+4. Build Command: `npm install && npm run build`
+5. Start Command: `npm run start`
+6. 添加环境变量 `DEEPSEEK_API_KEY`、`DASHSCOPE_API_KEY`
+7. 点 **Create Web Service**
 
 ## 项目结构
 
@@ -96,4 +99,4 @@ chemlit-ai/
 
 ## 后续改进
 
-改进项目后，推送 GitHub → Render 自动重新部署。无需额外操作。
+改进项目后，推送 GitHub → Vercel 自动重新部署。无需额外操作。
