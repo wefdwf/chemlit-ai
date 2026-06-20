@@ -11,7 +11,7 @@ const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 const DEEPSEEK_MODEL = "deepseek-chat";
 
 // Prompt 版本号：改 prompt 后手动 +1，旧缓存自动失效
-const PROMPT_VERSION = "v12";
+const PROMPT_VERSION = "v13";
 
 type AnalysisType = "main" | "overview" | "structure" | "terms";
 
