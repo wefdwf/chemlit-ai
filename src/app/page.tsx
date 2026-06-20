@@ -393,70 +393,67 @@ export default function Home() {
 
     setChartError(null);
 
-    // 客户端压缩图片，避免 base64 超过 Vercel 4.5MB 限制
-    const MAX_DIM = 1600; // 长边最大像素
-    const MAX_BASE64 = 3.5 * 1024 * 1024; // ~3.5MB base64（原始~2.6MB）
+    const MAX_DIM = 1600;
+    const MAX_BASE64 = 3.5 * 1024 * 1024;
 
-    const img = new Image();
-    img.onload = () => {
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-      const originalSize = file.size;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const originalDataUrl = reader.result as string;
 
-      // 超过最大尺寸才缩放
-      if (w > MAX_DIM || h > MAX_DIM) {
-        const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-      }
+      // 先尝试加载图片，如果需要缩放则用 canvas 压缩
+      const img = new Image();
+      img.onload = () => {
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
 
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        // fallback: 无法压缩时直接读原图
-        const reader = new FileReader();
-        reader.onload = () => setChartPending({ dataUrl: reader.result as string, mimeType: file.type });
-        reader.readAsDataURL(file);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, w, h);
+        if (w <= MAX_DIM && h <= MAX_DIM && originalDataUrl.length <= MAX_BASE64) {
+          // 图片尺寸和大小都 OK，直接使用
+          setChartPending({ dataUrl: originalDataUrl, mimeType: file.type || "image/png" });
+          return;
+        }
 
-      // 图表截图优先用 PNG 保持清晰，但质量过大时降级为 JPEG
-      let mimeType = file.type || "image/png";
-      let quality = 0.92;
+        // 需要缩放
+        if (w > MAX_DIM || h > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
 
-      // 先试 PNG
-      let dataUrl = canvas.toDataURL(mimeType, quality);
-      let base64Len = dataUrl.length;
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setChartPending({ dataUrl: originalDataUrl, mimeType: file.type || "image/png" });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
 
-      // 如果 PNG 仍然太大，转 JPEG 压缩
-      if (base64Len > MAX_BASE64) {
-        mimeType = "image/jpeg";
-        quality = 0.85;
-        dataUrl = canvas.toDataURL(mimeType, quality);
-        base64Len = dataUrl.length;
-      }
+        let mimeType = file.type || "image/png";
+        let quality = 0.92;
+        let dataUrl = canvas.toDataURL(mimeType, quality);
 
-      // 进一步降质量
-      if (base64Len > MAX_BASE64) {
-        quality = 0.7;
-        dataUrl = canvas.toDataURL("image/jpeg", quality);
-        base64Len = dataUrl.length;
-      }
+        if (dataUrl.length > MAX_BASE64) {
+          dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          mimeType = "image/jpeg";
+        }
+        if (dataUrl.length > MAX_BASE64) {
+          dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        }
 
-      if (base64Len > MAX_BASE64) {
-        setChartError(`图片经压缩后仍较大（${(base64Len / 1024 / 1024).toFixed(1)}MB），建议截取更小区域或降低截图分辨率后重试`);
-        return;
-      }
+        if (dataUrl.length > MAX_BASE64) {
+          setChartError(`图片经压缩后仍较大（${(dataUrl.length / 1024 / 1024).toFixed(1)}MB），建议截取更小区域或降低截图分辨率后重试`);
+          return;
+        }
 
-      setChartPending({ dataUrl, mimeType });
+        setChartPending({ dataUrl, mimeType });
+      };
+      img.onerror = () => {
+        setChartError("图片加载失败，请重试");
+      };
+      img.src = originalDataUrl;
     };
-    img.onerror = () => {
-      setChartError("图片加载失败，请重试");
-    };
-    img.src = URL.createObjectURL(file);
+    reader.readAsDataURL(file);
   }, [mainRequested]);
 
   // 图表解读 —— 确认上传
@@ -948,7 +945,9 @@ function ChartUploadTab({
   onCancelChart: () => void;
 }) {
   const isRejected = chartResult?.includes("该图片不是学术图表");
-  const rejectText = isRejected ? chartResult!.split("\n").filter(line => !line.includes("该图片不是学术图表")).join(" ").trim() : "";
+  const rejectText = isRejected
+    ? chartResult!.replace(/^\*\*该图片不是学术图表\*\*\s*/, "").trim()
+    : "";
   const chartWarning = "若上传图表和当前文献无关，图表解析准确度会明显下降，建议上传本文内图表";
   return (
     <div>
@@ -1035,7 +1034,12 @@ function ChartUploadTab({
                 alt="上传的图表"
                 className="max-w-full rounded-xl border border-slate-200"
               />
-              <p className="text-xs text-slate-500 mt-2 font-medium">{rejectText}</p>
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm font-semibold text-red-700">该图片不是学术图表</p>
+                {rejectText && (
+                  <p className="text-xs text-red-600 mt-1">{rejectText}</p>
+                )}
+              </div>
             </div>
           )}
         </>
