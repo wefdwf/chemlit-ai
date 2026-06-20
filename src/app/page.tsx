@@ -392,11 +392,71 @@ export default function Home() {
     }
 
     setChartError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setChartPending({ dataUrl: reader.result as string, mimeType: file.type });
+
+    // 客户端压缩图片，避免 base64 超过 Vercel 4.5MB 限制
+    const MAX_DIM = 1600; // 长边最大像素
+    const MAX_BASE64 = 3.5 * 1024 * 1024; // ~3.5MB base64（原始~2.6MB）
+
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      const originalSize = file.size;
+
+      // 超过最大尺寸才缩放
+      if (w > MAX_DIM || h > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        // fallback: 无法压缩时直接读原图
+        const reader = new FileReader();
+        reader.onload = () => setChartPending({ dataUrl: reader.result as string, mimeType: file.type });
+        reader.readAsDataURL(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // 图表截图优先用 PNG 保持清晰，但质量过大时降级为 JPEG
+      let mimeType = file.type || "image/png";
+      let quality = 0.92;
+
+      // 先试 PNG
+      let dataUrl = canvas.toDataURL(mimeType, quality);
+      let base64Len = dataUrl.length;
+
+      // 如果 PNG 仍然太大，转 JPEG 压缩
+      if (base64Len > MAX_BASE64) {
+        mimeType = "image/jpeg";
+        quality = 0.85;
+        dataUrl = canvas.toDataURL(mimeType, quality);
+        base64Len = dataUrl.length;
+      }
+
+      // 进一步降质量
+      if (base64Len > MAX_BASE64) {
+        quality = 0.7;
+        dataUrl = canvas.toDataURL("image/jpeg", quality);
+        base64Len = dataUrl.length;
+      }
+
+      if (base64Len > MAX_BASE64) {
+        setChartError(`图片经压缩后仍较大（${(base64Len / 1024 / 1024).toFixed(1)}MB），建议截取更小区域或降低截图分辨率后重试`);
+        return;
+      }
+
+      setChartPending({ dataUrl, mimeType });
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      setChartError("图片加载失败，请重试");
+    };
+    img.src = URL.createObjectURL(file);
   }, [mainRequested]);
 
   // 图表解读 —— 确认上传
