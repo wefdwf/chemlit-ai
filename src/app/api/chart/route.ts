@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.QWEN_API_KEY || "sk-cbda5a5d6c0f43288409d5243d06cd89";
-    if (!apiKey || apiKey === "你的千问API_KEY") {
+    const apiKey = process.env.QWEN_API_KEY;
+    if (!apiKey) {
       return NextResponse.json(
         { error: "千问 API Key 未配置，请在 .env.local 中设置 QWEN_API_KEY" },
         { status: 500 }

@@ -13,7 +13,7 @@
 | 框架 | Next.js 16 (App Router + Turbopack) |
 | 语言 | TypeScript |
 | 样式 | Tailwind CSS 4 |
-| AI | DeepSeek Chat API |
+| AI | DeepSeek v4-pro API |
 | PDF 解析 | pdfjs-dist（浏览器端解析） |
 | 图表解读 | 千问 VL API |
 | 部署 | Vercel + 自定义域名 chemlit.cyou |
@@ -37,10 +37,10 @@ npm install
 
 ```env
 DEEPSEEK_API_KEY=sk-你的DeepSeek密钥
-DASHSCOPE_API_KEY=sk-你的千问密钥（可选，图表解读用）
+QWEN_API_KEY=sk-你的千问密钥（可选，图表解读用）
 ```
 
-DeepSeek API Key 在 [platform.deepseek.com](https://platform.deepseek.com) 获取，充值 ¥10 能用很久——每次分析约 ¥0.01-0.02（1-2 分钱），¥10 ≈ 500-1000 次。
+DeepSeek API Key 在 [platform.deepseek.com](https://platform.deepseek.com) 获取，充值 ¥10 能用很久——每次分析约 ¥0.11（输入 token），¥10 ≈ 90 次。
 
 ### 4. 启动
 
@@ -74,7 +74,7 @@ npm run start
 3. 点 **New Web Service** → 选择仓库
 4. Build Command: `npm install && npm run build`
 5. Start Command: `npm run start`
-6. 添加环境变量 `DEEPSEEK_API_KEY`、`DASHSCOPE_API_KEY`
+6. 添加环境变量 `DEEPSEEK_API_KEY`、`QWEN_API_KEY`
 7. 点 **Create Web Service**
 
 ## 项目结构
@@ -91,7 +91,8 @@ chemlit-ai/
 │   │   ├── layout.tsx              # 根布局
 │   │   └── page.tsx                # 主页面（单页应用，所有交互逻辑）
 │   └── lib/
-│       └── prompts.ts              # AI Prompt 模板
+│       ├── prompts.ts              # AI Prompt 模板（v15）
+│       └── compressText.ts         # 浏览器端文本压缩
 ├── package.json
 ├── tsconfig.json
 └── next.config.ts

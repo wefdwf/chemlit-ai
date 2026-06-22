@@ -46,6 +46,7 @@ next-env.d.ts
 
 # Python
 __pycache__/
+tests/outputs/
 
 
 

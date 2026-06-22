@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
+import { compressText } from "@/lib/compressText";
 
 type Tab = "overview" | "structure" | "terms" | "chart";
 type Subject =
@@ -204,11 +205,17 @@ export default function Home() {
 	        throw new Error("PDF 中未能提取到文字，可能是扫描版 PDF");
 	      }
 
-	      // 发送提取后的文本（而非 PDF 文件），轻松通过 Vercel 限制
+	      // 浏览器端文本压缩：去参考文献/致谢/页眉页脚 → 空白规范化 → 智能截断
+	      const { text: compressedText, originalLength, compressedLength, reductionPercent } = compressText(fullText);
+	      if (reductionPercent > 0) {
+	        console.log(`文本压缩：${originalLength.toLocaleString()} → ${compressedLength.toLocaleString()} 字符（${reductionPercent}%）`);
+	      }
+
+	      // 发送压缩后的文本（而非 PDF 文件），轻松通过 Vercel 限制
 	      const res = await fetch("/api/upload", {
 	        method: "POST",
 	        headers: { "Content-Type": "application/json" },
-	        body: JSON.stringify({ text: fullText, title: file.name }),
+	        body: JSON.stringify({ text: compressedText, title: file.name }),
 	      });
 	      if (!res.ok) {
 	        const errText = await res.text().catch(() => "");
@@ -623,7 +630,12 @@ export default function Home() {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleFile(file);
+                      if (!file) return;
+                      if (file.type !== "application/pdf" && !file.name.endsWith(".pdf")) {
+                        setError("仅支持 PDF 文件");
+                        return;
+                      }
+                      handleFile(file);
                     }}
                   />
                   {uploading ? (

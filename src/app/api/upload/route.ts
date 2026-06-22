@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({
-        text: text.slice(0, 80000),
+        text,
         pages: 0, // 客户端解析时页数未知
         title: title || "已上传文献",
       });
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      text: text.slice(0, 80000),
+      text,
       pages: totalPages,
       title: "已上传文献",
     });

@@ -8,10 +8,10 @@ import {
 } from "@/lib/prompts";
 
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
-const DEEPSEEK_MODEL = "deepseek-chat";
+const DEEPSEEK_MODEL = "deepseek-v4-pro";
 
 // Prompt 版本号：改 prompt 后手动 +1，旧缓存自动失效
-const PROMPT_VERSION = "v13";
+const PROMPT_VERSION = "v15";
 
 type AnalysisType = "main" | "overview" | "structure" | "terms";
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (paperText.length > 100000) {
+    if (paperText.length > 200000) {
       return NextResponse.json(
         { error: "论文过长，请限制在 30 页以内" },
         { status: 400 }
@@ -87,13 +87,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 构建缓存 key：hash(论文 + 问题 + 方向 + 类型 + prompt版本)
+    // 构建缓存 key：hash(论文 + 问题 + 方向 + 类型 + prompt版本 + 模型)
     const cacheKey = createHash("sha256")
       .update(paperText)
       .update(userQuestion || "")
       .update(selectedSubject || "")
       .update(type)
       .update(PROMPT_VERSION)
+      .update(DEEPSEEK_MODEL)
       .digest("hex");
 
     // force 跳过缓存
