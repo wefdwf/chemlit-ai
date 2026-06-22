@@ -41,12 +41,8 @@ yarn-error.log*
 next-env.d.ts
 *.tar.gz
 
-.vercel
 .claude/.verification-done
 
 # Python
 __pycache__/
 tests/outputs/
-
-
-
